@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 const props = defineProps({
   products: { type: Array, default: () => [] },
@@ -11,7 +11,7 @@ const props = defineProps({
   pageCount: { type: Number, default: 0 }
 });
 const emit = defineEmits([
-  'search', 'reset-search', 'create', 'edit', 'delete', 'batch-delete',
+  'search', 'reset-search', 'create', 'copy', 'edit', 'delete', 'batch-delete',
   'toggle-one', 'toggle-visible', 'quantity-change', 'import', 'export',
   'backup', 'restore', 'print'
 ]);
@@ -19,6 +19,7 @@ const emit = defineEmits([
 const keyword = ref('');
 const importInput = ref();
 const restoreInput = ref();
+let searchTimer;
 
 const visibleIds = computed(() => props.products.map((item) => item.id));
 const selectedVisibleCount = computed(() => visibleIds.value.filter((id) => props.selectedIds.has(id)).length);
@@ -26,16 +27,27 @@ const allVisibleSelected = computed(() => props.products.length > 0 && selectedV
 const partiallySelected = computed(() => selectedVisibleCount.value > 0 && !allVisibleSelected.value);
 
 watch(keyword, (value) => {
-  if (!value.trim()) emit('reset-search');
+  clearTimeout(searchTimer);
+  const normalized = value.trim();
+  if (!normalized) {
+    emit('reset-search');
+    return;
+  }
+  searchTimer = setTimeout(() => emit('search', normalized), 300);
 });
 
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
 function submitSearch() {
-  emit('search', keyword.value.trim());
+  clearTimeout(searchTimer);
+  const normalized = keyword.value.trim();
+  if (normalized) emit('search', normalized);
+  else emit('reset-search');
 }
 
 function clearSearch() {
+  if (!keyword.value) emit('reset-search');
   keyword.value = '';
-  emit('reset-search');
 }
 
 function chooseImport() {
@@ -57,7 +69,7 @@ function fileSelected(event, type) {
   <section class="left-panel">
     <div class="toolbar">
       <div class="search-row">
-        <el-input v-model="keyword" clearable placeholder="搜索 SKU、名称或配置" @keyup.enter="submitSearch" />
+        <el-input v-model="keyword" clearable placeholder="输入 SKU、名称或配置后自动筛选" @keyup.enter="submitSearch" />
         <el-button type="primary" @click="submitSearch">搜索</el-button>
         <el-button @click="clearSearch">清空</el-button>
       </div>
@@ -115,8 +127,9 @@ function fileSelected(event, type) {
             />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="102" fixed="right" align="center">
+        <el-table-column label="操作" width="148" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button link type="primary" @click="emit('copy', row)">复制</el-button>
             <el-button link type="primary" @click="emit('edit', row)">编辑</el-button>
             <el-button link type="danger" @click="emit('delete', row)">删除</el-button>
           </template>

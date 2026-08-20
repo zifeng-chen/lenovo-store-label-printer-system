@@ -24,8 +24,11 @@ const quantities = reactive({});
 const loading = ref(false);
 const saving = ref(false);
 const modalVisible = ref(false);
+const modalMode = ref('create');
+const modalResetKey = ref(0);
 const editingProduct = ref(null);
 const activeQuery = ref('');
+let searchRequestId = 0;
 
 const selectedProducts = computed(() => products.value.filter((item) => selectedIds.value.has(item.id)));
 const labels = computed(() => {
@@ -81,45 +84,74 @@ async function initialize() {
 }
 
 async function search(keyword) {
-  activeQuery.value = keyword;
+  const normalized = keyword.trim();
+  if (!normalized) {
+    resetSearch();
+    return;
+  }
+
+  const requestId = ++searchRequestId;
+  activeQuery.value = normalized;
   loading.value = true;
   try {
-    displayedProducts.value = await getProducts(keyword);
+    const result = await getProducts(normalized);
+    if (requestId === searchRequestId) displayedProducts.value = result;
   } catch (error) {
-    showError(error);
+    if (requestId === searchRequestId) showError(error);
   } finally {
-    loading.value = false;
+    if (requestId === searchRequestId) loading.value = false;
   }
 }
 
 function resetSearch() {
+  searchRequestId += 1;
   activeQuery.value = '';
   displayedProducts.value = products.value;
+  loading.value = false;
 }
 
 function openCreate() {
+  modalMode.value = 'create';
   editingProduct.value = null;
+  modalResetKey.value += 1;
+  modalVisible.value = true;
+}
+
+function openCopy(product) {
+  modalMode.value = 'copy';
+  editingProduct.value = product;
+  modalResetKey.value += 1;
   modalVisible.value = true;
 }
 
 function openEdit(product) {
+  modalMode.value = 'edit';
   editingProduct.value = product;
+  modalResetKey.value += 1;
   modalVisible.value = true;
 }
 
-async function saveProduct(payload) {
+async function saveProduct(payload, continueAdding = false) {
   saving.value = true;
   try {
-    if (editingProduct.value) {
+    if (modalMode.value === 'edit') {
       await updateProduct(editingProduct.value.id, payload);
       ElMessage.success('商品已更新');
+      modalVisible.value = false;
     } else {
       const created = await createProduct(payload);
       selectedIds.value = new Set([...selectedIds.value, created.id]);
       quantities[created.id] = 1;
-      ElMessage.success('商品已新增');
+      if (continueAdding) {
+        modalMode.value = 'create';
+        editingProduct.value = null;
+        modalResetKey.value += 1;
+        ElMessage.success('商品已新增，请继续录入');
+      } else {
+        modalVisible.value = false;
+        ElMessage.success('商品已新增');
+      }
     }
-    modalVisible.value = false;
     await refreshProducts();
   } catch (error) {
     showError(error);
@@ -268,6 +300,7 @@ onMounted(initialize);
         @search="search"
         @reset-search="resetSearch"
         @create="openCreate"
+        @copy="openCopy"
         @edit="openEdit"
         @delete="removeOne"
         @batch-delete="removeSelected"
@@ -282,6 +315,13 @@ onMounted(initialize);
       />
       <PreviewPanel :pages="pages" :label-count="labels.length" />
     </main>
-    <ProductModal v-model="modalVisible" :product="editingProduct" :saving="saving" @save="saveProduct" />
+    <ProductModal
+      v-model="modalVisible"
+      :product="editingProduct"
+      :mode="modalMode"
+      :reset-key="modalResetKey"
+      :saving="saving"
+      @save="saveProduct"
+    />
   </div>
 </template>

@@ -187,6 +187,7 @@ button, input, textarea { font: inherit; }
 .preview-empty .empty-icon { width: 68px; height: 88px; margin-bottom: 18px; display: grid; place-items: center; border: 2px solid #cbd5e1; border-radius: 6px; color: #93a4b6; font-size: 16px; font-weight: 700; box-shadow: 8px 8px 0 #e8edf3; }
 .preview-empty strong { color: #3a4e62; font-size: 15px; }
 .preview-empty p { margin: 7px 0 0; font-size: 12px; }
+.copy-product-tip { margin-bottom: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .el-dialog { border-radius: 12px; }
 .el-dialog__header { border-bottom: 1px solid #edf0f4; padding-bottom: 15px; }
